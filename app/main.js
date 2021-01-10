@@ -96,7 +96,7 @@ let remoteStreamElement = (id) => {
     newstr.autoplay = true;
     newstr.id = "stream-"+id;
     newstr.playsinline = true;
-    newstr.style = "background-color: black; object-fit: fill; width:30%; margin-right: 2%; height: 100%;";
+    newstr.style = "";
     streams.appendChild(newstr);
     counter += 1;
     elem = newstr;
@@ -123,7 +123,7 @@ let createPeerConnection = (id) => {
     pcs[id] = new RTCPeerConnection(PC_CONFIG);
     console.log(pcs[id]);
     pcs[id].onicecandidate = (event) => { onIceCandidate(event, id); };
-    pcs[id].onaddstream = (event) => { onAddStream(event, id); };
+    pcs[id].ontrack = (event) => { onTrack(event, id); };
     pcs[id].oniceconnectionstatechange = (event) => { onIceConnectionStateChange(event, id); };
     pcs[id].addStream(localStream);
     console.log('PeerConnection created');
@@ -164,9 +164,9 @@ let onIceCandidate = (event, id) => {
   }
 };
 
-let onAddStream = (event, id) => {
+let onTrack = (event, id) => {
   console.log('Add stream');
-  remoteStreamElement(id).srcObject = event.stream;
+  remoteStreamElement(id).srcObject = event.streams[0];
 };
 
 let onIceConnectionStateChange = (event, id) => {
