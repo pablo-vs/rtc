@@ -59,7 +59,7 @@ const PC_CONFIG = {
       credential: TURN_SERVER_CREDENTIAL
     }*/
   ],
-  iceTransportPolicy: 'relay'
+  //iceTransportPolicy: 'relay'
 };
 console.log(PC_CONFIG);
 //const PC_CONFIG = {};
@@ -92,14 +92,19 @@ let streams = document.getElementById("streams");
 let remoteStreamElement = (id) => {
   let elem = document.getElementById("stream-"+id)
   if (elem === null) {
+    let div = document.createElement("div");
+    div.classList.add("video");
     let newstr = document.createElement("video");
     newstr.autoplay = true;
     newstr.id = "stream-"+id;
     newstr.playsinline = true;
     newstr.style = "";
-    streams.appendChild(newstr);
+    div.appendChild(newstr);
+    streams.appendChild(div);
     counter += 1;
     elem = newstr;
+    //streams.style.display = "none";
+    //streams.style.display = "flex";
   }
   return elem
 }
@@ -185,7 +190,7 @@ let onIceConnectionStateChange = (event, id) => {
 	    remoteStreamElement(id).srcObject = senders[send].track;
 	}
     }*/
-    remoteStreamElement(id).style.width = "30%";
+    //remoteStreamElement(id).style.width = "30%";
   }
 }
 
