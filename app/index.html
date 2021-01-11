@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>microRTC</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
 	<link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -10,13 +11,48 @@
 		<div id="streams">
 		</div>
 		<div id="controls">
-			<div id="stats"></div>
+			<div id="stats">
+				<div class="labels">
+					<label id="stats-id"></label>
+					<label id="stats-number"></label>
+				</div>
+			</div>
 			<div id="buttons">
-				<div id="camera" class="button"></div>
-				<div id="mic" class="button"></div>
-				<div id="chat" class="button"></div>
-				<div id="record" class="button"></div>
-				<div id="share screen" class="button"></div>
+				<div id="camera" class="button">
+					<div class="icon">
+						<i class="fa fa-video-camera" aria-hidden="true"></i>
+					</div>
+				</div>
+				<div id="mic" class="button">
+					<div class="icon">
+						<i class="fa fa-microphone" aria-hidden="true"></i>
+					</div>
+				</div>
+				<div id="chat" class="button">
+					<div class="icon">
+						<i class="fa fa-comments" aria-hidden="true"></i>
+					</div>
+				</div>
+				<div id="record" class="button">
+					<div class="icon">
+						<i class="fa fa-play" aria-hidden="true"></i>
+					</div>
+				</div>
+				<div id="share" class="button">
+					<div class="icon">
+						<i class="fa fa-desktop" aria-hidden="true"></i>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div style="font-size: 0.5em; position: absolute; height: 1%; right: 0%; bottom:1%; color:white;">Icons made by <a href="https://www.flaticon.com/authors/kiranshastry" title="Kiranshastry">Kiranshastry</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+	</div>
+	<div id="overlay">
+		<div class="form">
+			<button id="create">Crear sala</button>
+			<div>
+				<button id="join">Unirse a sala</button>
+				<input type="text" id="room-id" placeholder="ID sala"></input>
 			</div>
 		</div>
 	</div>
