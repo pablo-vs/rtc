@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>microRTC</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link rel="stylesheet" href="sub-style.css">
+</head>
+<body>
+	<div id="body">
+		<div id="main">
+			<div id="streams">
+			</div>
+			<div id="controls">
+				<div id="stats">
+					<div class="labels">
+						<label id="stats-id"></label>
+						<label id="stats-number"></label>
+					</div>
+				</div>
+				<div id="buttons">
+					<div id="camera" class="button">
+						<div class="icon">
+							<i class="fa fa-video-camera" aria-hidden="true"></i>
+						</div>
+					</div>
+					<div id="mic" class="button">
+						<div class="icon">
+							<i class="fa fa-microphone" aria-hidden="true"></i>
+						</div>
+					</div>
+					<div id="chat-button" class="button">
+						<div class="icon">
+							<i class="fa fa-comments" aria-hidden="true"></i>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div id="chat">
+			<textarea id="chat-read" readonly></textarea>
+			<textarea id="chat-write" placeholder="Escribe un mensaje y pulsa Enter"></textarea>
+		</div>
+		<div style="font-size: 0.5em; position: absolute; height: 1%; right: 0%; bottom:1%; color:white;">Icons made by <a href="https://www.flaticon.com/authors/kiranshastry" title="Kiranshastry">Kiranshastry</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+	</div>
+	<!--<div id="overlay">
+		<div class="form">
+			<button id="create">Crear sala</button>
+			<div>
+				<button id="join">Unirse a sala</button>
+				<input type="text" id="room-id" placeholder="ID sala"></input>
+			</div>
+		</div>
+	</div>-->
+    <script src="https://unpkg.com/ion-sdk-js@1.5.5/dist/ion-sdk.min.js"></script>
+    <script src="https://unpkg.com/ion-sdk-js@1.5.5/dist/json-rpc.min.js"></script>
+    <script src="sub-main.js"></script>
+</body>
+</html>

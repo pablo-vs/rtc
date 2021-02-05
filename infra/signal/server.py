@@ -3,6 +3,7 @@ print("Starting")
 from aiohttp import web
 import ssl
 import socketio
+import struct
 
 sio = socketio.AsyncServer(cors_allowed_origins='*', ping_timeout=35)
 app = web.Application()
@@ -11,17 +12,20 @@ ssl_context.load_cert_chain('/signaling/fullchain.pem', '/signaling/privkey.pem'
 sio.attach(app)
 
 clients = dict()
-rooms = set()
+rooms = {"123"}
 
-def hash(string):
+def hashCode(string):
     h = 0
     if len(string) == 0:
         return 0;
     for c in string:
-        h = ((h<<5) - h) + c
+        h = ((h<<5) - h) + ord(c)
+        h = h & ((1<<32)-1)
+        h = struct.unpack('<1i', h.to_bytes(4, byteorder='little'))[0]
+        print(h)
 
-    h = h & ((1<<32)-1)
-    return hex(h)[2:]
+    print(hex(h))
+    return f"{abs(h):08x}"
 
 @sio.event
 async def connect(sid, environ):
@@ -36,13 +40,13 @@ async def setup(sid, data):
         return False, "Missing room identifier"
     else:
         if data['room'] not in rooms:
-            if 'host' not in data:
-                return False, "Missing host identifier"
-            elif hash(data['host']) != data['room']:
+            if 'host' not in data or data['host'] is None:
+                return False, "Room does not exist"
+            elif hashCode(data['host']) != data['room']:
+                print(hashCode(data['host']))
                 return False, "Could not verify host"
             else:
                 rooms.add(data['room'])
-                
 
     clients[data['id']] = sid
     await sio.save_session(sid, {'id' : data['id'], 'room' : data['room']})   
@@ -56,7 +60,7 @@ async def disconnect(sid):
     sess = await sio.get_session(sid)
     sio.leave_room(sid, sess['room'])
     clients.pop(sess['id'])
-    sio.emmit("disconnected", data={'id': sess['id']}, room=sess['room']);
+    await sio.emit("disconnected", data={'id': sess['id']}, room=sess['room']);
     print('Disconnected', sid)
 
 @sio.event

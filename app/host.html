@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>microRTC</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link rel="stylesheet" href="host-style.css">
+</head>
+<body>
+	<div id="body">
+		<div id="streams">
+			<div id="local-streams">
+			</div>
+			<div id="remote-streams">
+			</div>
+		</div>
+		<div id="bottom-panel">
+			<div id="controls">
+				<div id="stats">
+					<div class="labels">
+						<label id="stats-id"></label>
+						<label id="stats-number"></label>
+					</div>
+				</div>
+				<div id="buttons">
+					<div id="add-stream" class="button">
+						<div class="icon">
+							<i class="fa fa-plus" aria-hidden="true"></i>
+						</div>
+					</div>
+					<div id="record" class="button">
+						<div class="icon">
+							<i class="fa fa-play" aria-hidden="true"></i>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="chat">
+				<textarea id="chat-read" readonly></textarea>
+				<textarea id="chat-write" placeholder="Escribe un mensaje y pulsa Enter"></textarea>
+			</div>
+		</div>
+		<div style="font-size: 0.5em; position: absolute; height: 1%; left: 0%; bottom:0.1%; color:white;">Icons made by <a href="https://www.flaticon.com/authors/kiranshastry" title="Kiranshastry">Kiranshastry</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
+	</div>
+	<!--<div id="overlay">
+		<div class="form">
+			<button id="create">Crear sala</button>
+			<div>
+				<button id="join">Unirse a sala</button>
+				<input type="text" id="room-id" placeholder="ID sala"></input>
+			</div>
+		</div>
+	</div>-->
+	<div id="add-stream-popup">
+		<div class="popup">
+			<div id="close-popup">
+				<i class="fa fa-times" aria-hidden="true"></i>
+			</div>
+			<div class="popup-buttons">
+				<button id="get-camera">Stream camera</button>
+				<button id="get-screen">Stream screen</button>
+				<button id="get-video">Stream video</button>
+				<input id="video-id" placeholder="Youtube video ID"></input>
+			</div>
+		</div>
+	</div>
+    <script src="https://unpkg.com/ion-sdk-js@1.5.5/dist/ion-sdk.min.js"></script>
+    <script src="https://unpkg.com/ion-sdk-js@1.5.5/dist/json-rpc.min.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

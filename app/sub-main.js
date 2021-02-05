@@ -84,12 +84,12 @@ const clientLocal = new IonSDK.Client(signalLocal, PC_CONFIG);
 signalLocal.onopen = () => clientLocal.join("test session");
 
 
-const signalSubscribers = new Signal.IonSFUJSONRPCSignal(
+const signalPublish = new Signal.IonSFUJSONRPCSignal(
   SIGNALING_SERVER_URL
 );
 
-const clientSubscribers = new IonSDK.Client(signalSubscribers, PC_CONFIG);
-signalSubscribers.onopen = () => clientSubscribers.join("subscriber_session");
+const clientPublish = new IonSDK.Client(signalPublish, PC_CONFIG);
+signalPublish.onopen = () => clientPublish.join("subscriber_session");
 
 
 async function waitForClient() {
@@ -102,15 +102,46 @@ async function waitForClient() {
   return new Promise(poll);
 }
 
+
 let control;
 
 async function controlDataChannel() {
   await waitForClient();
   control = await clientLocal.createDataChannel("control");
   console.log("Control data channel created");
+  control.onmessage = (msg) => {
+    [video, ev, ts] = msg.data.split(" ");
+    console.log(video + " " + ev);
+    console.log(msg.data);
+    switch(ev) {
+    case "-4":
+    case "-3":
+      if (!(video in videos)) {
+        getVideo(video, parseInt(ev)+2, ts);
+      }
+      break;
+    case "-2":
+    case "-1":
+      getVideo(video, ev, ts);
+      break;
+    case "0":
+      videos[video].stopVideo();
+      el = document.getElementById("player="+video).parentElement;
+      el.parentElement.removeChild(el);
+    case "1":
+      videos[video].seekTo(ts);
+      videos[video].playVideo();
+      break;
+    case "2":
+      videos[video].pauseVideo();
+      videos[video].seekTo(ts);
+      break;
+    }
+  }
 }
 
 controlDataChannel();
+
 
 /*
  *
@@ -126,7 +157,7 @@ defaultConstraints = {
 audioConstraints = true;
 
 
-let localStreams = {};
+let localStream;
 
 
 const getLocalStream = async (constraints = null) => {
@@ -143,66 +174,19 @@ const getLocalStream = async (constraints = null) => {
   if(!gum)
     return null;
 
-  localStreams[gum.id] = gum;
-
-  //localStream.addTrack(track);
-  //playbackStream.addTrack(track);
-
-  return gum.id;
-}
-
-const getDisplayStream = async (constraints = null) => {
-  gum = await IonSDK.LocalStream.getDisplayMedia({video: true, audio: true}).catch(
-    (error) => {
-      alert("Could not access screen: " + error);
-    }
-  )
-
-  console.log("Got display stream " + gum.id);
-
-  if(!gum)
-    return null;
-
-  localStreams[gum.id] = gum;
-  console.log("Got display stream " + gum.id);
-  return gum.id;
-};
-
-
-
-function addLocalStream(id = null) {
-  getLocalStreamElement(id).srcObject = localStreams[id];
-  //getLocalStreamElement(id).muted = true;
-  console.log("Local video track added");
-}
-
-function removeLocalStream(id) {
-  localStreams[id].getTracks().forEach((t) => t.stop());
-  delete localStreams[id]
-  removeLocalStreamElement(id);
+  localStream = gum;
+  return true;
 }
 
 
-let subscribers = {};
 
-clientSubscribers.ontrack = (track, stream) => {
+clientLocal.ontrack = (track, stream) => {
   console.log("got track", track.id, "for stream", stream.id);
   stream.onremovetrack = () => {
     console.log("Track ended");
     removeRemoteStreamElement(stream.id);
   }
   strElem = getRemoteStreamElement(stream.id);
-  if (!(stream.id in subscribers)) {
-    console.log("New subscriber");
-    subscribers[stream.id] = null;
-    for (id in videos) {
-      if (videos[id].getIframe().parentElement.children[1].children[0].on) {
-        code = videos[id].playState == 1 ? " -4 " : " -3 "
-        control.send(id + code + videos[id].getCurrentTime());
-        console.log(id + code + videos[id].getCurrentTime());
-      }
-    }
-  }
   if (strElem.srcObject === null) {
     strElem.srcObject = stream;
   } else {
@@ -211,164 +195,65 @@ clientSubscribers.ontrack = (track, stream) => {
 };
 
 
-
 /*
  *
  *  UI
  *
  */
 
-const remoteStreamContainer = document.getElementById("remote-streams");
-const localStreamContainer = document.getElementById("local-streams");
+const streamContainer = document.getElementById("streams");
 
 function getRemoteStreamElement(id) {
   let elem = document.getElementById("remote-stream-"+id)
   if (elem === null) {
     let div = document.createElement("div");
-    div.classList.add("video");
+    div.classList.add("stream-container");
     let newstr = document.createElement("video");
     newstr.autoplay = true;
     newstr.id = "remote-stream-"+id;
     newstr.playsinline = true;
+    newstr.muted = false;
     div.appendChild(newstr);
-    remoteStreamContainer.appendChild(div);
+    streamContainer.appendChild(div);
     elem = newstr;
   }
   return elem
 }
 
 function removeRemoteStreamElement(id) {
-  remoteStreamContainer.removeChild(getRemoteStreamElement(id).parentElement);
+  streamContainer.removeChild(getRemoteStreamElement(id).parentElement);
 }
 
-function getLocalStreamElement(id) {
-  let elem = document.getElementById("local-stream-"+id)
+function getLocalStreamElement() {
+  let elem = document.getElementById("local-stream")
   if (elem === null) {
     let div = document.createElement("div");
-    div.classList.add("local","stream-container");
+    div.classList.add("stream-container");
 
     let newstr = document.createElement("video");
-    newstr.classList.add("local","video");
     newstr.autoplay = true;
     newstr.muted = true;
-    newstr.id = "local-stream-"+id;
+    newstr.id = "local-stream";
     newstr.playsinline = true;
 
-    let contDiv = createStreamControls(newstr, id);
     div.appendChild(newstr);
-    div.appendChild(contDiv);
-
-    localStreamContainer.appendChild(div);
+    streamContainer.appendChild(div);
     elem = newstr;
   }
   return elem
 }
 
-function createStreamControls(strElem, id) {
-  let cont = document.createElement("div");
-  cont.classList.add("stream-controls");
-
-  cont.innerHTML = `
-      <div class="publish button">
-        <div class="icon">
-          <i class="fa fa-wifi" aria-hidden="true"></i>
-        </div
-      </div>`;
-
-  cont.innerHTML += `
-      <div class="camera button">
-        <div class="icon">
-          <i class="fa fa-video-camera" aria-hidden="true"></i>
-        </div
-      </div>`;
-
-  cont.innerHTML += `
-      <div class="mute button">
-        <div class="icon">
-          <i class="fa fa-microphone" aria-hidden="true"></i>
-        </div
-      </div>`;
-
-  cont.innerHTML += `
-      <div class="remove button">
-        <div class="icon">
-          <i class="fa fa-times" aria-hidden="true"></i>
-        </div
-      </div>`;
+const localStreamElement = getLocalStreamElement();
 
 
-
-  let publish = cont.children[0];
-  publish.on = false;
-  publish.onclick = () => publishStream(strElem, publish);
-
-  let disable = cont.children[1];
-  disable.on = false;
-  disable.onclick = () => disableStream(strElem, disable);
-
-  let mute = cont.children[2];
-  mute.on = false;
-  mute.onclick = () => muteStream(strElem, mute);
-
-  let remove = cont.children[3];
-  remove.onclick = () => {
-    if (strElem.srcObject != undefined) {
-      strElem.srcObject.unpublish();
-      removeLocalStream(id);
-    } else {
-      videos[id].stopVideo();
-      delete videos[id]
-      localStreamContainer.removeChild(document.getElementById("player="+id).parentElement);
-    }
-  }
-
-  return cont;
-}
-
-function publishStream(strElem, publish) {
-  if(strElem.srcObject == undefined) {
-    publishVideo(strElem.id, publish);
-    return;
-  }
-  if (publish.on) {
-    strElem.srcObject.unpublish();
-    publish.on = false;
-    publish.style.backgroundColor = "black";
-  } else {
-    clientLocal.publish(strElem.srcObject);
-    publish.on = true;
-    publish.style.backgroundColor = "lightblue";
-  }
-}
-
-function publishVideo(id, publish) {
-  id = id.split("=")[1];
-  if (publish.on) {
-    console.log("unpublish "+id);
-    control.send(id + " 0");
-    publish.on = false;
-    publish.style.backgroundColor = "black";
-  } else {
-    console.log("publish "+id + " " + videos[id].getCurrentTime());
-    if(videos[id].getPlayerState() == 1) {
-      control.send(id + " -2 " + videos[id].getCurrentTime());
-    } else {
-      control.send(id + " -1");
-    }
-    publish.on = true;
-    publish.style.backgroundColor = "lightblue";
-  }
-}
 
 function disableStream(strElem, disable) {
   if (disable.on) {
     strElem.srcObject.getVideoTracks()[0].enabled = true;
-    strElem.srcObject.unmute('video');
     disable.on = false;
     disable.style.backgroundColor = "lightblue";
   } else {
     strElem.srcObject.getVideoTracks()[0].enabled = false;
-    strElem.srcObject.mute('video');
     disable.on = true;
     disable.style.backgroundColor = "black";
   }
@@ -376,20 +261,82 @@ function disableStream(strElem, disable) {
 
 function muteStream(strElem, mute) {
   if (mute.on) {
-    strElem.srcObject.unmute('audio');
+    strElem.srcObject.getAudioTracks()[0].enabled = true;
     mute.on = false;
     mute.style.backgroundColor = "lightblue";
   } else {
-    strElem.srcObject.mute('audio');
+    strElem.srcObject.getAudioTracks()[0].enabled = false;
     mute.on = true;
     mute.style.backgroundColor = "black";
   }
 }
 
-function removeLocalStreamElement(id) {
-  localStreamContainer.removeChild(getLocalStreamElement(id).parentElement);
-}
 
+let videos = {};
+
+
+function getVideo(id, playState, ts) {
+  let div = document.createElement("div");
+  div.classList.add("stream-container");
+
+  let newstr = document.createElement("div");
+  newstr.id = "player="+id;
+  newstr.classList.add("local","video");
+
+  let overlay = document.createElement("div");
+  overlay.classList.add("player-overlay");
+
+  let fs = document.createElement("div");
+  fs.classList.add("fullscreen-button");
+
+  let icon = document.createElement("i");
+  icon.classList.add("fa", "fa-square-o");
+  icon.ariaHidden = true;
+
+  div.resizeObs = new ResizeObserver((entries) => {
+    videos[id].setSize(entries[0].contentRect.width, entries[0].contentRect.height);
+  });
+
+  div.resizeObs.observe(div);
+
+  fs.appendChild(icon);
+  overlay.appendChild(fs);
+  div.appendChild(overlay);
+
+  fs.onclick = () => {
+    if (!document.fullscreenElement) {
+      div/*.children[1]*/.requestFullscreen();
+      //videos[id].setSize(screen.width, screen.height);
+    } else {
+      //videos[id].setSize(0,0);
+      document.exitFullscreen();
+      //setTimeout(() => videos[id].setSize(div.clientWidth, 9*div.clientWidth/16), 100);
+    }
+  }
+
+  div.appendChild(newstr);
+  streamContainer.appendChild(div);
+
+  function onPlayerReady(event) {
+    if (playState == -2)
+      event.target.setPlaybackQuality('hd720');
+      event.target.seekTo(ts);
+      event.target.playVideo();
+  }
+
+  player = new YT.Player('player='+id, {
+    style: "height: auto; width: 100%;",
+    videoId: id,
+    playerVars: { 'controls': 0 },
+    disablekb: 1,
+    events: {
+      'onReady': onPlayerReady,
+      //'onStateChange': onPlayerStateChange
+    }
+  });
+
+  videos[id] = player;
+}
 
 
 
@@ -401,85 +348,28 @@ function removeLocalStreamElement(id) {
  *
  */
 
-let addStreamButton = document.getElementById("add-stream");
-let recordButton = document.getElementById("record");
-let chatElement = document.getElementById("chat-read");
-let messageElement = document.getElementById("chat-write");
+let cameraButton = document.getElementById("camera");
+let micButton = document.getElementById("mic");
+let chatButton = document.getElementById("chat-button");
+chatButton.on = false;
 
+cameraButton.onclick = () => disableStream(localStreamElement, cameraButton);
+micButton.onclick = () => muteStream(localStreamElement, micButton);
 
-
-
-
-async function getCamera() {
-  let id = await getLocalStream();
-  if(!id) {
-    alert("Could not get local stream");
+chatButton.onclick = () => {
+  if (chatButton.on) {
+    chatButton.on = false;
+    chatButton.style.backgroundColor = "black";
+    document.getElementById("chat").classList.remove("show");
+    document.getElementById("main").classList.remove("shrink");
   } else {
-    addLocalStream(id);
+    chatButton.on = true;
+    chatButton.style.backgroundColor = "lightblue";
+    document.getElementById("chat").classList.add("show");
+    document.getElementById("main").classList.add("shrink");
   }
 }
 
-async function getScreen() {
-  let id = await getDisplayStream();
-  if(!id) {
-    alert("Could not get local display");
-  } else {
-    addLocalStream(id);
-  }
-}
-
-let videos = {};
-
-async function getVideo() {
-  videoId = document.getElementById("video-id").value;
-
-  let div = document.createElement("div");
-  div.classList.add("local","stream-container");
-
-  let newstr = document.createElement("div");
-  newstr.id = "player="+videoId;
-  newstr.classList.add("local","video");
-
-  let contDiv = createStreamControls(newstr, videoId);
-  div.appendChild(newstr);
-  div.appendChild(contDiv);
-
-  localStreamContainer.appendChild(div);
-
-  function onPlayerReady(event) {
-    event.target.playVideo();
-  }
-
-  function onPlayerStateChange(event) {
-    if (contDiv.children[0].on)
-      control.send(videoId + " " + event.data + " " + videos[videoId].getCurrentTime());
-  }
-
-  player = new YT.Player('player='+videoId, {
-    style: "height: auto; width: 80%;",
-    videoId: videoId,
-    //playerVars: { 'autoplay': 1, 'controls': 0 },
-    events: {
-      'onReady': onPlayerReady,
-      'onStateChange': onPlayerStateChange
-    }
-  });
-
-  videos[videoId] = player;
-}
-
-
-addStreamButton.onclick = async () => {
-  document.getElementById("add-stream-popup").classList.add("show");
-}
-
-document.getElementById("close-popup").onclick = () => {
-  document.getElementById("add-stream-popup").classList.remove("show");
-}
-
-document.getElementById("get-camera").onclick = getCamera;
-document.getElementById("get-screen").onclick = getScreen;
-document.getElementById("get-video").onclick = getVideo;
 
 function displayStats() {
   document.getElementById("stats-id").textContent = "ID de sala: " + roomId;
@@ -487,7 +377,20 @@ function displayStats() {
 }
 
 
+async function start() {
+  let ls = await getLocalStream();
+  if(!ls) {
+    alert("Could not get local stream");
+  } else {
+    await waitForClient();
+    localStreamElement.srcObject = localStream;
+    clientPublish.publish(localStream);
+  }
+}
 
+
+let chatElement = document.getElementById("chat-read");
+let messageElement = document.getElementById("chat-write");
 
 let chat;
 
@@ -499,7 +402,7 @@ async function startChat() {
   }
   messageElement.onkeyup = (ev) => {
     if(ev.keyCode == 13) {
-      chat.send("Host:\n" + messageElement.value);
+      chat.send(UNIQUE_ID + ":\n" + messageElement.value);
       chatElement.value += "Tú:\n";
       chatElement.value += messageElement.value;
       messageElement.value = "";
@@ -508,8 +411,9 @@ async function startChat() {
 }
 
 startChat();
-getCamera();
-//start();
+
+
+start();
 
 
 /*
@@ -562,7 +466,6 @@ document.getElementById("join").onclick = (event) => {
     }
   });
 };*/
-
 
 
 
