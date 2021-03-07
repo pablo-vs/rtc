@@ -26,6 +26,8 @@ func (s *server) Signal(stream pb.AVP_SignalServer) error {
 	for {
 		in, err := stream.Recv()
 
+		log.Infof("Signal request received")
+
 		if err != nil {
 			if err == io.EOF {
 				return nil

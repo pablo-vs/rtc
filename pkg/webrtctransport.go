@@ -230,23 +230,29 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 		return errors.New("element not found")
 	}
 
-	b := t.builders[tid]
-	if b == nil {
-		log.Debugf("builder not found for track %s. queuing.", tid)
-		t.pending[tid] = append(t.pending[tid], PendingProcess{
-			pid: pid,
-			fn:  func() Element { return e(t.id, pid, tid, config) },
-		})
-		return nil
-	}
+	log.Debugf("Builders: \n%s", t.builders)
 
-	process := t.processes[pid]
-	if process == nil {
-		process = e(t.id, pid, tid, config)
-		t.processes[pid] = process
-	}
+	for id, b := range t.builders {
 
-	b.AttachElement(process)
+		if b == nil {
+			log.Debugf("builder not found for track %s. queuing.", id)
+			t.pending[id] = append(t.pending[id], PendingProcess{
+				pid: id,
+				fn:  func() Element { return e(t.id, id, id, config) },
+			})
+			return nil
+		}
+		log.Debugf("Obtained builder %s", id)
+
+		process := t.processes[id]
+		if process == nil {
+			process = e(t.id, id, id, config)
+			t.processes[id] = process
+		}
+
+		b.AttachElement(process)
+
+	}
 
 	return nil
 }
