@@ -42,6 +42,7 @@ if(true || document.cookie === "") {
 
 // Config variables: change them to point to your own servers
 const SIGNALING_SERVER_URL = 'wss://rtc-static.tk:5000/ws';
+const RECORDING_SERVER_URL = 'wss://rtc-static.tk:1000'; // TODO
 //const SIGNALING_SERVER_URL = 'http://localhost:9999';
 //const TURN_SERVER_URL = 'localhost:3478';
 const STUN_SERVER_URL = 'turn.rtc-static.tk:3478';
@@ -74,6 +75,33 @@ const PC_CONFIG = {
 console.log(PC_CONFIG);
 //const PC_CONFIG = {};
 
+
+
+function sendStartRecording() {
+	const data = {
+		type: "start",
+		ssid: "subscriber_session"
+	};
+	const params = {
+		body: data,
+		method: "POST
+	};
+	fetch(url, params)
+	.then(res => console.log(res.json()))
+}
+
+function sendStopRecording() {
+	data = {
+		type: "stop",
+		ssid: "subscriber_session"
+	}
+	const params = {
+		body: data,
+		method: "POST
+	};
+	fetch(url, params)
+	.then(res => console.log(res.json()))
+}
 
 
 const signalLocal = new Signal.IonSFUJSONRPCSignal(
@@ -471,6 +499,19 @@ async function getVideo() {
 
 addStreamButton.onclick = async () => {
   document.getElementById("add-stream-popup").classList.add("show");
+}
+
+recordButton.on = false
+recordButton.onclick = () => {
+	if (recordButton.on) {
+		recordButton.on = false;
+		sendStopRecording();
+		disable.style.backgroundColor = "black";
+	} else {
+		recordButton.on = true;
+		sendStartRecording();
+		disable.style.backgroundColor = "lightblue";
+	}
 }
 
 document.getElementById("close-popup").onclick = () => {
