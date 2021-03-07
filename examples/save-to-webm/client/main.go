@@ -28,6 +28,16 @@ type RecordingRequest struct {
 	Ssid string
 }
 
+func enableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+}
+
+func setupResponse(w *http.ResponseWriter, req *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+    (*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+    (*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
 func main() {
 	fixByFile := []string{"asm_amd64.s", "proc.go"}
 	fixByFunc := []string{}
@@ -50,6 +60,12 @@ func main() {
 	c := pb.NewAVPClient(conn)
 
 	http.HandleFunc("/record", func(w http.ResponseWriter, r *http.Request) {
+
+		setupResponse(&w, req)
+
+		if (*req).Method == "OPTIONS" {
+			return
+		}
 
 		body, err := ioutil.ReadAll(r.Body)
 		if err != nil {
