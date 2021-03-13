@@ -63,6 +63,8 @@ func (s *WebmSaver) Close() {
 			log.Errorf("video close err: %s", err)
 		}
 	}
+
+	s.sampleWriter.Close()
 }
 
 func (s *WebmSaver) pushOpus(sample *avp.Sample) {

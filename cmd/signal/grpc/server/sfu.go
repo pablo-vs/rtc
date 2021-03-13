@@ -60,6 +60,7 @@ func (s *SFU) GetTransport(sid string) (*avp.WebRTCTransport, error) {
 			return nil, err
 		}
 		t.OnClose(func() {
+			log.Infof("Closing transport from sfu")
 			s.mu.Lock()
 			defer s.mu.Unlock()
 			delete(s.transports, sid)

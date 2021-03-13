@@ -61,9 +61,9 @@ func main() {
 
 	http.HandleFunc("/record", func(w http.ResponseWriter, r *http.Request) {
 
-		setupResponse(&w, req)
+		setupResponse(&w, r)
 
-		if (*req).Method == "OPTIONS" {
+		if (*r).Method == "OPTIONS" {
 			return
 		}
 
@@ -107,6 +107,37 @@ func main() {
 				return
 			}
 			log.Infof("Sent signal request")
+			fmt.Fprintf(w, "{\"ok\":true}")
+
+		} else if rr.Type == "stop" {
+
+			sid := rr.Ssid
+			ctx := context.Background()
+			client, err := c.Signal(ctx)
+
+			if err != nil {
+				log.Errorf("Error intializing avp signal stream: %s", err)
+				return
+			}
+
+			err = client.Send(&pb.SignalRequest{
+				Payload: &pb.SignalRequest_Process{
+					Process: &pb.Process{
+						Sfu: sfu,
+						Pid: "close",
+						Sid: sid,
+						Tid: "close",
+						Eid: "webmsaver",
+					},
+				},
+			})
+
+			if err != nil {
+				log.Errorf("error sending signal request: %s", err)
+				return
+			}
+			log.Infof("Sent signal request")
+			fmt.Fprintf(w, "{\"ok\":true}")
 		}
 
 	})

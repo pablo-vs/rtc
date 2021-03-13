@@ -17,6 +17,8 @@ const (
 	subscriber = 1
 )
 
+var webmsaver_config []byte
+
 // WebRTCTransportConfig represents configuration options
 type WebRTCTransportConfig struct {
 	configuration webrtc.Configuration
@@ -136,6 +138,14 @@ func NewWebRTCTransport(id string, c Config) *WebRTCTransport {
 			delete(t.pending, id)
 		}
 
+		if t.pending["all"] != nil {
+			e := registry.GetElement("webmsaver")
+			proc := e(t.id, id, id, webmsaver_config)
+			t.processes[id] = proc
+			builder.AttachElement(proc)
+			log.Infof("Adding %s to %s", id, t.id)
+		}
+
 		if track.Kind() == webrtc.RTPCodecTypeVideo {
 			err := sub.pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{SenderSSRC: uint32(track.SSRC()), MediaSSRC: uint32(track.SSRC())}})
 			if err != nil {
@@ -154,6 +164,7 @@ func NewWebRTCTransport(id string, c Config) *WebRTCTransport {
 
 			if t.isEmpty() {
 				// No more tracks, cleanup transport
+				log.Infof("Empty transport. Closing...")
 				t.Close()
 			}
 		})
@@ -205,6 +216,7 @@ func (t *WebRTCTransport) OnClose(f func()) {
 // Close the webrtc transport
 func (t *WebRTCTransport) Close() error {
 	t.mu.Lock()
+	log.Infof("Closing transport")
 	defer t.mu.Unlock()
 
 	if t.onCloseFn != nil {
@@ -222,7 +234,6 @@ func (t *WebRTCTransport) Close() error {
 func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 	log.Infof("WebRTCTransport.Process id=%s", pid)
 	t.mu.Lock()
-	defer t.mu.Unlock()
 
 	e := registry.GetElement(eid)
 	if e == nil {
@@ -230,30 +241,67 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 		return errors.New("element not found")
 	}
 
+	webmsaver_config = config
+
 	log.Debugf("Builders: \n%s", t.builders)
+
+	if pid == "all" {
+
+		t.pending["all"] = []PendingProcess{PendingProcess{
+			pid: "all",
+			fn: func() Element {return nil},
+		}}
+
+		log.Infof("Pending: %v", t.pending)
+
+		log.Infof("Set pending to all")
+	} 
 
 	for id, b := range t.builders {
 
-		if b == nil {
-			log.Debugf("builder not found for track %s. queuing.", id)
-			t.pending[id] = append(t.pending[id], PendingProcess{
-				pid: id,
-				fn:  func() Element { return e(t.id, id, id, config) },
-			})
-			return nil
-		}
-		log.Debugf("Obtained builder %s", id)
+		log.Infof("Processing builder %v %v", id, b)
 
-		process := t.processes[id]
-		if process == nil {
-			process = e(t.id, id, id, config)
-			t.processes[id] = process
-		}
+		if pid == "close" {
+			log.Infof("Attempting to stop %s", id)
+			defer func(bid string, b *Builder) {
+				log.Infof("Attempting to stop %s", bid)
+				/*for _,e := range b.elements {
+					e.Close()
+				}
+				b.elements = []Element{}*/
+				b.stop()
+				t.processes[id] = nil
+			}(id, b)
+		} else if pid == "all" {
 
-		b.AttachElement(process)
+			defer func (id string, b *Builder) {
+		/*	if b == nil {
+				log.Debugf("builder not found for track %s. queuing.", id)
+				t.pending[id] = append(t.pending[id], PendingProcess{
+					pid: id,
+					fn:  func() Element { return e(t.id, id, id, config) },
+				})
+				return nil
+			}*/
+				log.Debugf("Obtained builder %s", id)
+
+				process := t.processes[id]
+				 if process == nil {
+					process = e(t.id, id, id, config)
+					t.processes[id] = process
+				}
+
+				b.AttachElement(process)
+			}(id, b)
+
+		}
 
 	}
+	if pid == "close" {
+		t.pending = make(map[string][]PendingProcess)
+	}
 
+	defer t.mu.Unlock()
 	return nil
 }
 

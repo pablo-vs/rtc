@@ -18,7 +18,7 @@ type FileWriter struct {
 // NewFileWriter instance
 // bufSize is the buffer size in bytes. Pass <=0 to disable buffering.
 func NewFileWriter(path string, bufSize int) *FileWriter {
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 
 	if err != nil {
 		log.Errorf("error initializing filewriter: %s", err)
