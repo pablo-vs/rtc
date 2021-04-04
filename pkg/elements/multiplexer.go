@@ -24,6 +24,10 @@ func NewMultiplexer(el avp.Element) avp.Element {
 	}
 }
 
+func (m *Multiplexer) GetTs() uint32 {
+	return 0
+}
+
 func (m *Multiplexer) Write(sample *avp.Sample) error {
 	sample.ID = m.id
 	err := m.el.Write(sample)

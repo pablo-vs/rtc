@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"os"
+	"strconv"
 
 	log "github.com/pion/ion-log"
 	"github.com/pion/rtcp"
@@ -138,7 +140,7 @@ func NewWebRTCTransport(id string, c Config) *WebRTCTransport {
 			delete(t.pending, id)
 		}
 
-		if t.pending["all"] != nil {
+		if t.pending["all"] != nil && builder.Track().Kind() == webrtc.RTPCodecTypeVideo {
 			e := registry.GetElement("webmsaver")
 			proc := e(t.id, id, id, webmsaver_config)
 			t.processes[id] = proc
@@ -235,6 +237,27 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 	log.Infof("WebRTCTransport.Process id=%s", pid)
 	t.mu.Lock()
 
+	if eid == "ts" {
+
+		f, err := os.OpenFile("/out/sync_"+t.id, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+
+		if err != nil {
+			log.Errorf("error opening file: %s", err)
+			return nil
+		}
+
+		defer f.Close()
+
+		f.WriteString(pid + "\n")
+		for id, p := range t.processes {
+			log.Infof("%v %v\n", id, strconv.Itoa(int(p.GetTs())))
+			f.WriteString(id + " " + strconv.Itoa(int(p.GetTs())) + "\n")
+		}
+		f.WriteString("\n")
+		defer t.mu.Unlock()
+		return nil
+	}
+
 	e := registry.GetElement(eid)
 	if e == nil {
 		log.Errorf("element not found: %s", eid)
@@ -244,6 +267,7 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 	webmsaver_config = config
 
 	log.Debugf("Builders: \n%s", t.builders)
+
 
 	if pid == "all" {
 
@@ -258,6 +282,11 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 	} 
 
 	for id, b := range t.builders {
+
+		if b.Track().Kind() != webrtc.RTPCodecTypeVideo {
+			log.Infof("Skipping audio builder %v", id)
+			continue
+		}
 
 		log.Infof("Processing builder %v %v", id, b)
 

@@ -18,6 +18,7 @@ type WebmSaver struct {
 	audioWriter, videoWriter       webm.BlockWriteCloser
 	audioTimestamp, videoTimestamp uint32
 	sampleWriter                   *SampleWriter
+	t							   uint32
 }
 
 // NewWebmSaver Initialize a new webm saver
@@ -25,6 +26,10 @@ func NewWebmSaver() *WebmSaver {
 	return &WebmSaver{
 		sampleWriter: NewSampleWriter(),
 	}
+}
+
+func (w *WebmSaver) GetTs() uint32 {
+	return w.t
 }
 
 // Write sample to webmsaver
@@ -101,6 +106,8 @@ func (s *WebmSaver) pushVP8(sample *avp.Sample) {
 			s.videoTimestamp = sample.Timestamp
 		}
 		t := (sample.Timestamp - s.videoTimestamp) / 90
+		s.t = t
+		//log.Infof("Sample timestamp: %v", t)
 		if _, err := s.videoWriter.Write(videoKeyframe, int64(t), payload); err != nil {
 			log.Errorf("video write err: %s", err)
 		}

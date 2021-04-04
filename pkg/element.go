@@ -5,4 +5,5 @@ type Element interface {
 	Write(*Sample) error
 	Attach(Element)
 	Close()
+	GetTs() uint32
 }

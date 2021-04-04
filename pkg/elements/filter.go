@@ -18,6 +18,10 @@ func NewFilter(condition func(*avp.Sample) bool) *Filter {
 	}
 }
 
+func (f *Filter) GetTs() uint32 {
+	return 0
+}
+
 func (f *Filter) Write(sample *avp.Sample) error {
 	if f.condition(sample) {
 		return f.Node.Write(sample)

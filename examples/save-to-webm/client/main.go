@@ -28,6 +28,11 @@ type RecordingRequest struct {
 	Ssid string
 }
 
+type TsRequest struct {
+	Ts string
+	Ssid string
+}
+
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
@@ -140,6 +145,54 @@ func main() {
 			fmt.Fprintf(w, "{\"ok\":true}")
 		}
 
+	})
+
+	http.HandleFunc("/ts", func(w http.ResponseWriter, r *http.Request) {
+
+		setupResponse(&w, r)
+
+		if (*r).Method == "OPTIONS" {
+			return
+		}
+
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		var ts TsRequest
+		err = json.Unmarshal(body, &ts)
+		if err != nil {
+			panic(err)
+		}
+		log.Infof(ts.Ts)
+		log.Infof(ts.Ssid)
+
+		sid := ts.Ssid
+		ctx := context.Background()
+		client, err := c.Signal(ctx)
+
+		if err != nil {
+			log.Errorf("Error intializing avp signal stream: %s", err)
+			return
+		}
+
+		err = client.Send(&pb.SignalRequest{
+			Payload: &pb.SignalRequest_Process{
+				Process: &pb.Process{
+					Sfu: sfu,
+					Pid: ts.Ts,
+					Sid: sid,
+					Tid: ts.Ts,
+					Eid: "ts",
+				},
+			},
+		})
+
+		if err != nil {
+			log.Errorf("error sending signal request: %s", err)
+			return
+		}
+		log.Infof("Sent signal request")
 	})
 
 	err = http.ListenAndServeTLS("0.0.0.0:8080", "/certs/cert.pem", "/certs/privkey.pem", nil)
