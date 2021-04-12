@@ -1,0 +1,1 @@
+docker run -d -v $(pwd)/certs:/certs --network=host ion_sfu_allrpc -c /configs/sfu.toml -key /certs/privkey.pem -cert /certs/fullchain.pem -jaddr "0.0.0.0:10000" -gaddr "0.0.0.0:10001" -maddr "0.0.0.0:4001"
