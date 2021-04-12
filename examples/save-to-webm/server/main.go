@@ -33,11 +33,22 @@ var (
 )
 
 func createWebmSaver(sid, pid, tid string, config []byte) avp.Element {
+	i := 0
+	file_path := path.Join(conf.Webmsaver.Path, fmt.Sprintf("%s-%s_%d.webm", sid, pid, i))
+	_, err := os.Stat(file_path)
+	for  err == nil {
+		log.Infof("File %v exists", file_path)
+		i++
+		file_path = path.Join(conf.Webmsaver.Path, fmt.Sprintf("%s-%s_%d.webm", sid, pid, i))
+		log.Infof("Trying file %v exists", file_path)
+		_, err = os.Stat(file_path)
+	}
+
 	filewriter := elements.NewFileWriter(
-		path.Join(conf.Webmsaver.Path, fmt.Sprintf("%s-%s.webm", sid, pid)),
+		file_path,
 		4096,
 	)
-	webm := elements.NewWebmSaver()
+	webm := elements.NewWebmSaver(uint32(i))
 	webm.Attach(filewriter)
 	return webm
 }

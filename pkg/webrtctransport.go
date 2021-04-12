@@ -142,7 +142,7 @@ func NewWebRTCTransport(id string, c Config) *WebRTCTransport {
 
 		if t.pending["all"] != nil && builder.Track().Kind() == webrtc.RTPCodecTypeVideo {
 			e := registry.GetElement("webmsaver")
-			proc := e(t.id, id, id, webmsaver_config)
+			proc := e(t.id, builder.Track().StreamID(), id, webmsaver_config)
 			t.processes[id] = proc
 			builder.AttachElement(proc)
 			log.Infof("Adding %s to %s", id, t.id)
@@ -250,8 +250,9 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 
 		f.WriteString(pid + "\n")
 		for id, p := range t.processes {
-			log.Infof("%v %v\n", id, strconv.Itoa(int(p.GetTs())))
-			f.WriteString(id + " " + strconv.Itoa(int(p.GetTs())) + "\n")
+			for t.builders[id] == nil {time.Sleep(1)}
+			log.Infof("%v_%v %v\n", t.builders[id].Track().StreamID(), strconv.Itoa(int(p.GetVersion())), strconv.Itoa(int(p.GetTs())))
+			f.WriteString(t.builders[id].Track().StreamID() + "_" + strconv.Itoa(int(p.GetVersion())) + " " + strconv.Itoa(int(p.GetTs())) + "\n")
 		}
 		f.WriteString("\n")
 		defer t.mu.Unlock()
@@ -283,11 +284,6 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 
 	for id, b := range t.builders {
 
-		if b.Track().Kind() != webrtc.RTPCodecTypeVideo {
-			log.Infof("Skipping audio builder %v", id)
-			continue
-		}
-
 		log.Infof("Processing builder %v %v", id, b)
 
 		if pid == "close" {
@@ -303,6 +299,10 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 			}(id, b)
 		} else if pid == "all" {
 
+			if b.Track().Kind() != webrtc.RTPCodecTypeVideo {
+				log.Infof("Skipping audio builder %v", id)
+				continue
+			}
 			defer func (id string, b *Builder) {
 		/*	if b == nil {
 				log.Debugf("builder not found for track %s. queuing.", id)
@@ -316,7 +316,7 @@ func (t *WebRTCTransport) Process(pid, tid, eid string, config []byte) error {
 
 				process := t.processes[id]
 				 if process == nil {
-					process = e(t.id, id, id, config)
+					process = e(t.id, b.Track().StreamID(), id, config)
 					t.processes[id] = process
 				}
 

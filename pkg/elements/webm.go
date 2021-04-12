@@ -19,17 +19,23 @@ type WebmSaver struct {
 	audioTimestamp, videoTimestamp uint32
 	sampleWriter                   *SampleWriter
 	t							   uint32
+	version						   uint32
 }
 
 // NewWebmSaver Initialize a new webm saver
-func NewWebmSaver() *WebmSaver {
+func NewWebmSaver(v uint32) *WebmSaver {
 	return &WebmSaver{
 		sampleWriter: NewSampleWriter(),
+		version: v,
 	}
 }
 
 func (w *WebmSaver) GetTs() uint32 {
 	return w.t
+}
+
+func (w *WebmSaver) GetVersion() uint32 {
+	return w.version
 }
 
 // Write sample to webmsaver

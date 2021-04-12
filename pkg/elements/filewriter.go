@@ -37,6 +37,9 @@ func NewFileWriter(path string, bufSize int) *FileWriter {
 func (f *FileWriter) GetTs() uint32 {
 	return 0
 }
+func (f *FileWriter) GetVersion() uint32 {
+	return 0
+}
 
 func (w *FileWriter) Write(sample *avp.Sample) error {
 	_, err := w.wr.Write(sample.Payload.([]byte))

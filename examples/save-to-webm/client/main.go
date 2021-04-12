@@ -33,6 +33,12 @@ type TsRequest struct {
 	Ssid string
 }
 
+type IdenRequest struct {
+	SubjectId string
+	StreamId string
+	Ssid string
+}
+
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
@@ -184,6 +190,55 @@ func main() {
 					Sid: sid,
 					Tid: ts.Ts,
 					Eid: "ts",
+				},
+			},
+		})
+
+		if err != nil {
+			log.Errorf("error sending signal request: %s", err)
+			return
+		}
+		log.Infof("Sent signal request")
+	})
+
+	http.HandleFunc("/iden", func(w http.ResponseWriter, r *http.Request) {
+
+		setupResponse(&w, r)
+
+		if (*r).Method == "OPTIONS" {
+			return
+		}
+
+		body, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
+		var req IdenRequest
+		err = json.Unmarshal(body, &req)
+		if err != nil {
+			panic(err)
+		}
+		log.Infof(req.SubjectId)
+		log.Infof(req.StreamId)
+		log.Infof(req.Ssid)
+
+		sid := req.Ssid
+		ctx := context.Background()
+		client, err := c.Signal(ctx)
+
+		if err != nil {
+			log.Errorf("Error intializing avp signal stream: %s", err)
+			return
+		}
+
+		err = client.Send(&pb.SignalRequest{
+			Payload: &pb.SignalRequest_Process{
+				Process: &pb.Process{
+					Sfu: sfu,
+					Pid: req.SubjectId,
+					Sid: sid,
+					Tid: req.StreamId,
+					Eid: "iden",
 				},
 			},
 		})

@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	log "github.com/pion/ion-log"
 	"github.com/pion/rtp"
@@ -84,6 +85,9 @@ func (b *Builder) AttachElement(e Element) {
 
 // Track returns the builders underlying track
 func (b *Builder) Track() *webrtc.TrackRemote {
+	for b.track == nil {
+		time.Sleep(1)
+	}
 	return b.track
 }
 

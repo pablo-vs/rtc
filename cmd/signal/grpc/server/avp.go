@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"sync"
+	"os"
 
 	avp "github.com/pion/ion-avp/pkg"
 	log "github.com/pion/ion-log"
@@ -49,6 +50,22 @@ func (a *AVP) Process(ctx context.Context, addr, pid, sid, tid, eid string, conf
 		}
 
 		return t.Process(pid, tid, eid, config)
+	} else if eid == "iden"{
+		a.mu.Lock()
+		defer a.mu.Unlock()
+
+		f, err := os.OpenFile("/out/iden_"+sid, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
+
+		if err != nil {
+			log.Errorf("error opening file: %s", err)
+			return nil
+		}
+
+		defer f.Close()
+
+		f.WriteString(pid + tid + "\n")
+		return nil
+
 	} else {
 		a.mu.Lock()
 		defer a.mu.Unlock()

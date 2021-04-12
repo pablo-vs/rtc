@@ -6,4 +6,5 @@ type Element interface {
 	Attach(Element)
 	Close()
 	GetTs() uint32
+	GetVersion() uint32
 }

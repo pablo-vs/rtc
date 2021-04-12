@@ -30,6 +30,9 @@ func NewConverter(typ int) *Converter {
 func (c *Converter) GetTs() uint32 {
 	return 0
 }
+func (c *Converter) GetVersion() uint32 {
+	return 0
+}
 
 func (c *Converter) Write(sample *avp.Sample) error {
 	var out []byte

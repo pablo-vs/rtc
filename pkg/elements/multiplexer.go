@@ -28,6 +28,10 @@ func (m *Multiplexer) GetTs() uint32 {
 	return 0
 }
 
+func (m *Multiplexer) GetVersion() uint32 {
+	return 0
+}
+
 func (m *Multiplexer) Write(sample *avp.Sample) error {
 	sample.ID = m.id
 	err := m.el.Write(sample)
