@@ -1,5 +1,19 @@
 /*
  *
+ *  Startup and joining
+ *
+ */
+
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+let roomId = urlParams.get('room_id');
+let subId = urlParams.get('subject');
+//let hostId = null;
+
+
+/*
+ *
  *  NETWORKING
  *
  */
@@ -32,7 +46,7 @@ function uuidv4() {
 let UNIQUE_ID;// = uuidv4();//String(1.00000000001**(new Date().getTime())%1).hashCode()
 
 if(true || document.cookie === "") {
-    UNIQUE_ID = uuidv4();
+    UNIQUE_ID = subId || uuidv4();
     //document.cookie = "unique_id="+UNIQUE_ID;
 } else {
     UNIQUE_ID = document.cookie.split(";")[0].split("=")[1];
@@ -42,6 +56,7 @@ if(true || document.cookie === "") {
 
 // Config variables: change them to point to your own servers
 const SIGNALING_SERVER_URL = 'wss://rtc-static.tk:5000/ws';
+const IDEN_SERVER_URL = 'https://rtc-static.tk:9999';
 //const SIGNALING_SERVER_URL = 'http://localhost:9999';
 //const TURN_SERVER_URL = 'localhost:3478';
 const STUN_SERVER_URL = 'turn.rtc-static.tk:3478';
@@ -75,13 +90,30 @@ console.log(PC_CONFIG);
 //const PC_CONFIG = {};
 
 
+async function sendIden() {
+	data = {
+		subjectId: subId,
+		streamId: localStream.id,
+		ssid: roomId + "_sub"
+	}
+	const params = {
+		body: JSON.stringify(data),
+		method: "POST"
+	};
+	res = await fetch(IDEN_SERVER_URL + '/iden', params)
+	//res = await res.json()
+	//console.log(res)
+	//return res.ok
+	return true
+}
+
 
 const signalLocal = new Signal.IonSFUJSONRPCSignal(
   SIGNALING_SERVER_URL
 );
 
 const clientLocal = new IonSDK.Client(signalLocal, PC_CONFIG);
-signalLocal.onopen = () => clientLocal.join("test session");
+signalLocal.onopen = () => clientLocal.join(roomId + "_host");
 
 
 const signalPublish = new Signal.IonSFUJSONRPCSignal(
@@ -89,7 +121,7 @@ const signalPublish = new Signal.IonSFUJSONRPCSignal(
 );
 
 const clientPublish = new IonSDK.Client(signalPublish, PC_CONFIG);
-signalPublish.onopen = () => clientPublish.join("subscriber_session");
+signalPublish.onopen = () => clientPublish.join(roomId + "_sub");
 
 
 async function waitForClient() {
@@ -286,6 +318,10 @@ function getVideo(id, playState, ts) {
   let overlay = document.createElement("div");
   overlay.classList.add("player-overlay");
 
+  let overlay2 = document.createElement("div");
+  overlay.classList.add("player-overlay");
+  overlay2.onclick = () => {videos[id].playVideo(); videos[id].stopVideo();};
+
   let fs = document.createElement("div");
   fs.classList.add("fullscreen-button");
 
@@ -301,6 +337,7 @@ function getVideo(id, playState, ts) {
 
   fs.appendChild(icon);
   overlay.appendChild(fs);
+  overlay.appendChild(overlay2);
   div.appendChild(overlay);
 
   fs.onclick = () => {
@@ -318,10 +355,11 @@ function getVideo(id, playState, ts) {
   streamContainer.appendChild(div);
 
   function onPlayerReady(event) {
-    if (playState == -2)
-      event.target.setPlaybackQuality('hd720');
-      event.target.seekTo(ts);
-      event.target.playVideo();
+	event.target.setPlaybackQuality('hd720');
+    event.target.seekTo(ts);
+    event.target.playVideo();
+    if (playState != -2)
+	  event.target.stopVideo();
   }
 
   player = new YT.Player('player='+id, {
@@ -385,6 +423,8 @@ async function start() {
     await waitForClient();
     localStreamElement.srcObject = localStream;
     clientPublish.publish(localStream);
+	sendIden();
+	console.log("Publishing...")
   }
 }
 
@@ -417,17 +457,6 @@ start();
 
 
 /*
- *
- *  Startup and joining
- *
- */
-/*
-const queryString = window.location.search;
-const urlParams = new URLSearchParams(queryString);
-
-let roomId = urlParams.get('room_id');
-let hostId = null;
-
 if(roomId != null) {
   connect((success, error) => {
     if(success) {

@@ -1,5 +1,18 @@
 /*
  *
+ *  Startup and joining
+ *
+ */
+
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+let roomId = urlParams.get('room_id');
+let hostId = null;
+
+
+/*
+ *
  *  NETWORKING
  *
  */
@@ -42,7 +55,7 @@ if(true || document.cookie === "") {
 
 // Config variables: change them to point to your own servers
 const SIGNALING_SERVER_URL = 'wss://rtc-static.tk:5000/ws';
-const RECORDING_SERVER_URL = 'wss://rtc-static.tk:1000'; // TODO
+const RECORDING_SERVER_URL = 'https://rtc-static.tk:9999'; // TODO
 //const SIGNALING_SERVER_URL = 'http://localhost:9999';
 //const TURN_SERVER_URL = 'localhost:3478';
 const STUN_SERVER_URL = 'turn.rtc-static.tk:3478';
@@ -77,30 +90,49 @@ console.log(PC_CONFIG);
 
 
 
-function sendStartRecording() {
+async function sendStartRecording() {
 	const data = {
 		type: "start",
-		ssid: "subscriber_session"
+		ssid: roomId + "_sub"
 	};
 	const params = {
-		body: data,
-		method: "POST
+		body: JSON.stringify(data),
+		method: "POST"
 	};
-	fetch(url, params)
-	.then(res => console.log(res.json()))
+	res = await fetch(RECORDING_SERVER_URL + '/record', params)
+	res = await res.json()
+	console.log(res)
+	return res.ok
 }
 
-function sendStopRecording() {
+async function sendStopRecording() {
 	data = {
 		type: "stop",
-		ssid: "subscriber_session"
+		ssid: roomId + "_sub"
 	}
 	const params = {
-		body: data,
-		method: "POST
+		body: JSON.stringify(data),
+		method: "POST"
 	};
-	fetch(url, params)
-	.then(res => console.log(res.json()))
+	res = await fetch(RECORDING_SERVER_URL + '/record', params)
+	res = await res.json()
+	console.log(res)
+	return res.ok
+}
+
+async function sendRecordTs(ts) {
+	data = {
+		ts: ts,
+		ssid: roomId + "_sub"
+	}
+	const params = {
+		body: JSON.stringify(data),
+		method: "POST"
+	};
+	res = await fetch(RECORDING_SERVER_URL + '/ts', params)
+	res = await res.json()
+	console.log(res)
+	return res.ok
 }
 
 
@@ -109,7 +141,7 @@ const signalLocal = new Signal.IonSFUJSONRPCSignal(
 );
 
 const clientLocal = new IonSDK.Client(signalLocal, PC_CONFIG);
-signalLocal.onopen = () => clientLocal.join("test session");
+signalLocal.onopen = () => clientLocal.join(roomId + "_host");
 
 
 const signalSubscribers = new Signal.IonSFUJSONRPCSignal(
@@ -117,7 +149,7 @@ const signalSubscribers = new Signal.IonSFUJSONRPCSignal(
 );
 
 const clientSubscribers = new IonSDK.Client(signalSubscribers, PC_CONFIG);
-signalSubscribers.onopen = () => clientSubscribers.join("subscriber_session");
+signalSubscribers.onopen = () => clientSubscribers.join(roomId + "_sub");
 
 
 async function waitForClient() {
@@ -225,7 +257,7 @@ clientSubscribers.ontrack = (track, stream) => {
     subscribers[stream.id] = null;
     for (id in videos) {
       if (videos[id].getIframe().parentElement.children[1].children[0].on) {
-        code = videos[id].playState == 1 ? " -4 " : " -3 "
+        code = videos[id].getPlayerState() == 1 ? " -4 " : " -3 "
         control.send(id + code + videos[id].getCurrentTime());
         console.log(id + code + videos[id].getCurrentTime());
       }
@@ -475,12 +507,14 @@ async function getVideo() {
   localStreamContainer.appendChild(div);
 
   function onPlayerReady(event) {
-    event.target.playVideo();
+    //event.target.playVideo();
   }
 
   function onPlayerStateChange(event) {
     if (contDiv.children[0].on)
       control.send(videoId + " " + event.data + " " + videos[videoId].getCurrentTime());
+	  if (recordButton.on)
+	    sendRecordTs(videoId + " " + event.data + " " + videos[videoId].getCurrentTime());
   }
 
   player = new YT.Player('player='+videoId, {
@@ -502,15 +536,19 @@ addStreamButton.onclick = async () => {
 }
 
 recordButton.on = false
-recordButton.onclick = () => {
+recordButton.onclick = async () => {
 	if (recordButton.on) {
 		recordButton.on = false;
-		sendStopRecording();
-		disable.style.backgroundColor = "black";
+		recordButton.style.backgroundColor = "red";
+		res = await sendStopRecording();
+		if (res)
+			recordButton.style.backgroundColor = "black";
 	} else {
 		recordButton.on = true;
-		sendStartRecording();
-		disable.style.backgroundColor = "lightblue";
+		recordButton.style.backgroundColor = "red";
+		res = await sendStartRecording();
+		if (res)
+			recordButton.style.backgroundColor = "lightblue";
 	}
 }
 
@@ -552,19 +590,7 @@ startChat();
 getCamera();
 //start();
 
-
 /*
- *
- *  Startup and joining
- *
- */
-/*
-const queryString = window.location.search;
-const urlParams = new URLSearchParams(queryString);
-
-let roomId = urlParams.get('room_id');
-let hostId = null;
-
 if(roomId != null) {
   connect((success, error) => {
     if(success) {

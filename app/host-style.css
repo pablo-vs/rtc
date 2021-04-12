@@ -276,3 +276,8 @@ textarea {
 	width: 10%;
 	margin-bottom: 10%;
 }
+
+iframe {
+	max-height: 100%;
+	max-width: 100%;
+}
