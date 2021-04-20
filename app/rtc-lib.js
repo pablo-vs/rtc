@@ -1,68 +1,19 @@
 /*
  *
- *  Startup and joining
+ *  CONFIGURATION
  *
  */
-
-const queryString = window.location.search;
-const urlParams = new URLSearchParams(queryString);
-
-let roomId = urlParams.get('room_id');
-let hostId = null;
-
-
-/*
- *
- *  NETWORKING
- *
- */
-
-
-
-Object.defineProperty(String.prototype, 'hashCode', {
-  value: function() {
-    var hash = 0, i, chr;
-    for (i = 0; i < this.length; i++) {
-      chr   = this.charCodeAt(i);
-      hash  = ((hash << 5) - hash) + chr;
-      hash |= 0; // Convert to 32bit integer
-      console.log(hash);
-    }
-    var strhash = ("00000000" + Math.abs(hash).toString(16));
-    return strhash.substr(strhash.length-8, strhash.length);
-  }
-});
-
-
-function uuidv4() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-
-let UNIQUE_ID;// = uuidv4();//String(1.00000000001**(new Date().getTime())%1).hashCode()
-
-if(true || document.cookie === "") {
-    UNIQUE_ID = uuidv4();
-    //document.cookie = "unique_id="+UNIQUE_ID;
-} else {
-    UNIQUE_ID = document.cookie.split(";")[0].split("=")[1];
-}
-
-
 
 // Config variables: change them to point to your own servers
 const SIGNALING_SERVER_URL = 'wss://rtc-static.tk:5000/ws';
-const RECORDING_SERVER_URL = 'https://rtc-static.tk:9999'; // TODO
-//const SIGNALING_SERVER_URL = 'http://localhost:9999';
-//const TURN_SERVER_URL = 'localhost:3478';
+const RECORDING_SERVER_URL = 'https://rtc-static.tk:9999';
+const IDEN_SERVER_URL = 'https://rtc-static.tk:9999';
 const STUN_SERVER_URL = 'turn.rtc-static.tk:3478';
 const TURN_SERVER_URL = 'turn.rtc-static.tk:3478';
 const TURN_SERVER_USERNAME = 'rtcstatic';
 const TURN_SERVER_CREDENTIAL = 'rtcstatic';
-// WebRTC config: you don't have to change this for the example to work
+
+// WebRTC config
 // If you are testing on localhost, you can just use PC_CONFIG = {}
 const PC_CONFIG = {
   iceServers: [
@@ -74,22 +25,59 @@ const PC_CONFIG = {
     {
       urls: 'stun:' + STUN_SERVER_URL + '?transport=tcp',
     },
-    /*{
-      urls: 'stun:' + STUN_SERVER_URL + '?transport=udp',
-    },
-    {
-      urls: 'turn:' + TURN_SERVER_URL + '?transport=udp',
-      username: TURN_SERVER_USERNAME,
-      credential: TURN_SERVER_CREDENTIAL
-    }*/
   ],
-  //iceTransportPolicy: 'relay'
 };
-console.log(PC_CONFIG);
+//console.log(PC_CONFIG);
 //const PC_CONFIG = {};
 
 
+/*
+ *
+ *  IDENTIFICATION
+ *
+ */
 
+// Find identifiers in URL params
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+const roomId = urlParams.get('room_id');
+const subId = urlParams.get('subject');
+const hostId = urlParams.get('host');
+
+function uuidv4() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+
+let UNIQUE_ID;
+
+
+/*
+ *
+ *  NETWORKING
+ *
+ */
+
+// Sends the unique id to the AVP client for stream-id association
+async function sendIden() {
+	data = {
+		subjectId: UNIQUE_ID,
+		streamId: localStreamId,
+		ssid: roomId + "_sub"
+	}
+	const params = {
+		body: JSON.stringify(data),
+		method: "POST"
+	};
+	res = await fetch(IDEN_SERVER_URL + '/iden', params)
+	return true
+}
+
+// Asks the AVP client to start recording
 async function sendStartRecording() {
 	const data = {
 		type: "start",
@@ -105,6 +93,7 @@ async function sendStartRecording() {
 	return res.ok
 }
 
+// Asks the AVP client to stop recording
 async function sendStopRecording() {
 	data = {
 		type: "stop",
@@ -120,6 +109,8 @@ async function sendStopRecording() {
 	return res.ok
 }
 
+// Asks the AVP client to register the recording timestamp of a
+// video timestamp
 async function sendRecordTs(ts) {
 	data = {
 		ts: ts,
@@ -135,46 +126,83 @@ async function sendRecordTs(ts) {
 	return res.ok
 }
 
+// SFU signals and client
 
-const signalLocal = new Signal.IonSFUJSONRPCSignal(
+const signalHost = new Signal.IonSFUJSONRPCSignal(
   SIGNALING_SERVER_URL
 );
 
-const clientLocal = new IonSDK.Client(signalLocal, PC_CONFIG);
-signalLocal.onopen = () => clientLocal.join(roomId + "_host");
+const clientHost = new IonSDK.Client(signalHost, PC_CONFIG);
+signalHost.onopen = () => clientHost.join(roomId + "_host");
 
 
-const signalSubscribers = new Signal.IonSFUJSONRPCSignal(
+const signalSub = new Signal.IonSFUJSONRPCSignal(
   SIGNALING_SERVER_URL
 );
 
-const clientSubscribers = new IonSDK.Client(signalSubscribers, PC_CONFIG);
-signalSubscribers.onopen = () => clientSubscribers.join(roomId + "_sub");
+const clientSub = new IonSDK.Client(signalSub, PC_CONFIG);
+signalSub.onopen = () => clientSub.join(roomId + "_sub");
 
 
+// Waits until client is connected
 async function waitForClient() {
 
   const poll = resolve => {
-    if(clientLocal.transports) resolve();
+    if(clientHost.transports) resolve();
     else setTimeout(_ => poll(resolve), 400);
   }
 
   return new Promise(poll);
 }
 
+
+// Control channel: allows sending video playback commands and other
+// control communication between host and subs
 let control;
 
-async function controlDataChannel() {
+async function createControlDataChannel() {
   await waitForClient();
-  control = await clientLocal.createDataChannel("control");
+  control = await clientHost.createDataChannel("control");
   console.log("Control data channel created");
 }
 
-controlDataChannel();
+// For subs, sets up the control logic
+function setupControlResponse() {
+  control.onmessage = (msg) => {
+    [video, ev, ts] = msg.data.split(" ");
+    console.log(video + " " + ev);
+    console.log(msg.data);
+    switch(ev) {
+    case "-4":
+    case "-3":
+      if (!(video in videos)) {
+        getVideo(video, parseInt(ev)+2, ts);
+      }
+      break;
+    case "-2":
+    case "-1":
+      getVideo(video, ev, ts);
+      break;
+    case "0":
+      videos[video].stopVideo();
+      el = document.getElementById("player="+video).parentElement;
+      el.parentElement.removeChild(el);
+    case "1":
+      videos[video].seekTo(ts);
+      videos[video].playVideo();
+      break;
+    case "2":
+      videos[video].pauseVideo();
+      videos[video].seekTo(ts);
+      break;
+    }
+  }
+}
+
 
 /*
  *
- *  Streams
+ *  STREAMS
  *
  */
 
@@ -185,8 +213,10 @@ defaultConstraints = {
 
 audioConstraints = true;
 
-
 let localStreams = {};
+let localStreamId;
+
+let subscribers = {};
 
 
 const getLocalStream = async (constraints = null) => {
@@ -204,9 +234,7 @@ const getLocalStream = async (constraints = null) => {
     return null;
 
   localStreams[gum.id] = gum;
-
-  //localStream.addTrack(track);
-  //playbackStream.addTrack(track);
+  localStreamId = gum.id;
 
   return gum.id;
 }
@@ -229,9 +257,24 @@ const getDisplayStream = async (constraints = null) => {
 };
 
 
+function setupClientHost() {
+  clientHost.ontrack = (track, stream) => {
+    console.log("got track", track.id, "for stream", stream.id);
+    stream.onremovetrack = () => {
+      console.log("Track ended");
+      removeRemoteStreamElement(stream.id);
+    }
+    strElem = getRemoteStreamElement(stream.id);
+    if (strElem.srcObject === null) {
+      strElem.srcObject = stream;
+    } else {
+      strElem.srcObject.addTrack(track);
+    }
+  };
+}
 
-function addLocalStream(id = null) {
-  getLocalStreamElement(id).srcObject = localStreams[id];
+function addLocalStream(id = null, host = false) {
+  getLocalStreamElement(id, host).srcObject = localStreams[id];
   //getLocalStreamElement(id).muted = true;
   console.log("Local video track added");
 }
@@ -242,33 +285,32 @@ function removeLocalStream(id) {
   removeLocalStreamElement(id);
 }
 
-
-let subscribers = {};
-
-clientSubscribers.ontrack = (track, stream) => {
-  console.log("got track", track.id, "for stream", stream.id);
-  stream.onremovetrack = () => {
-    console.log("Track ended");
-    removeRemoteStreamElement(stream.id);
-  }
-  strElem = getRemoteStreamElement(stream.id);
-  if (!(stream.id in subscribers)) {
-    console.log("New subscriber");
-    subscribers[stream.id] = null;
-    for (id in videos) {
-      if (videos[id].getIframe().parentElement.children[1].children[0].on) {
-        code = videos[id].getPlayerState() == 1 ? " -4 " : " -3 "
-        control.send(id + code + videos[id].getCurrentTime());
-        console.log(id + code + videos[id].getCurrentTime());
+function setupClientSub() {
+  clientSub.ontrack = (track, stream) => {
+    console.log("got track", track.id, "for stream", stream.id);
+    stream.onremovetrack = () => {
+      console.log("Track ended");
+      removeRemoteStreamElement(stream.id);
+    }
+    strElem = getRemoteStreamElement(stream.id);
+    if (!(stream.id in subscribers)) {
+      console.log("New subscriber");
+      subscribers[stream.id] = null;
+      for (id in videos) {
+        if (videos[id].getIframe().parentElement.children[1].children[0].on) {
+          code = videos[id].getPlayerState() == 1 ? " -4 " : " -3 "
+          control.send(id + code + videos[id].getCurrentTime());
+          console.log(id + code + videos[id].getCurrentTime());
+        }
       }
     }
-  }
-  if (strElem.srcObject === null) {
-    strElem.srcObject = stream;
-  } else {
-    strElem.srcObject.addTrack(track);
-  }
-};
+    if (strElem.srcObject === null) {
+      strElem.srcObject = stream;
+    } else {
+      strElem.srcObject.addTrack(track);
+    }
+  };
+}
 
 
 
@@ -279,17 +321,30 @@ clientSubscribers.ontrack = (track, stream) => {
  */
 
 const remoteStreamContainer = document.getElementById("remote-streams");
-const localStreamContainer = document.getElementById("local-streams");
+let localStreamContainer;
 
-function getRemoteStreamElement(id) {
+function setLocalStreamContainer(host = false) {
+	if (host)
+		localStreamContainer = document.getElementById("local-streams");
+	else
+		localStreamContainer = remoteStreamContainer;
+}
+
+
+function getRemoteStreamElement(id, host = false) {
   let elem = document.getElementById("remote-stream-"+id)
   if (elem === null) {
     let div = document.createElement("div");
-    div.classList.add("video");
+	if (host)
+      div.classList.add("video");
+	else
+	  div.classList.add("stream-container");
+
     let newstr = document.createElement("video");
     newstr.autoplay = true;
     newstr.id = "remote-stream-"+id;
     newstr.playsinline = true;
+	newstr.muted = false;
     div.appendChild(newstr);
     remoteStreamContainer.appendChild(div);
     elem = newstr;
@@ -301,12 +356,15 @@ function removeRemoteStreamElement(id) {
   remoteStreamContainer.removeChild(getRemoteStreamElement(id).parentElement);
 }
 
-function getLocalStreamElement(id) {
+function getLocalStreamElement(id, host = false) {
   let elem = document.getElementById("local-stream-"+id)
   if (elem === null) {
     let div = document.createElement("div");
-    div.classList.add("local","stream-container");
-
+	if (host)
+      div.classList.add("local","stream-container");
+	else
+      div.classList.add("stream-container");
+	
     let newstr = document.createElement("video");
     newstr.classList.add("local","video");
     newstr.autoplay = true;
@@ -314,9 +372,13 @@ function getLocalStreamElement(id) {
     newstr.id = "local-stream-"+id;
     newstr.playsinline = true;
 
-    let contDiv = createStreamControls(newstr, id);
-    div.appendChild(newstr);
-    div.appendChild(contDiv);
+	if (host) {
+      let contDiv = createStreamControls(newstr, id);
+      div.appendChild(newstr);
+      div.appendChild(contDiv);
+	} else {
+      div.appendChild(newstr);
+	}
 
     localStreamContainer.appendChild(div);
     elem = newstr;
@@ -395,7 +457,7 @@ function publishStream(strElem, publish) {
     publish.on = false;
     publish.style.backgroundColor = "black";
   } else {
-    clientLocal.publish(strElem.srcObject);
+    clientHost.publish(strElem.srcObject);
     publish.on = true;
     publish.style.backgroundColor = "lightblue";
   }
@@ -451,46 +513,77 @@ function removeLocalStreamElement(id) {
 }
 
 
-
-
-
-
-/*
- *
- * BUTTONS
- *
- */
-
-let addStreamButton = document.getElementById("add-stream");
-let recordButton = document.getElementById("record");
-let chatElement = document.getElementById("chat-read");
-let messageElement = document.getElementById("chat-write");
-
-
-
-
-
-async function getCamera() {
-  let id = await getLocalStream();
-  if(!id) {
-    alert("Could not get local stream");
-  } else {
-    addLocalStream(id);
-  }
-}
-
-async function getScreen() {
-  let id = await getDisplayStream();
-  if(!id) {
-    alert("Could not get local display");
-  } else {
-    addLocalStream(id);
-  }
-}
-
 let videos = {};
 
-async function getVideo() {
+
+function getVideoSub(id, playState, ts) {
+  let div = document.createElement("div");
+  div.classList.add("stream-container");
+
+  let newstr = document.createElement("div");
+  newstr.id = "player="+id;
+  newstr.classList.add("local","video");
+
+  let overlay = document.createElement("div");
+  overlay.classList.add("player-overlay");
+
+  let overlay2 = document.createElement("div");
+  overlay.classList.add("player-overlay");
+  overlay2.onclick = () => {videos[id].playVideo(); videos[id].stopVideo();};
+
+  let fs = document.createElement("div");
+  fs.classList.add("fullscreen-button");
+
+  let icon = document.createElement("i");
+  icon.classList.add("fa", "fa-square-o");
+  icon.ariaHidden = true;
+
+  div.resizeObs = new ResizeObserver((entries) => {
+    videos[id].setSize(entries[0].contentRect.width, entries[0].contentRect.height);
+  });
+
+  div.resizeObs.observe(div);
+
+  fs.appendChild(icon);
+  overlay.appendChild(fs);
+  overlay.appendChild(overlay2);
+  div.appendChild(overlay);
+
+  fs.onclick = () => {
+    if (!document.fullscreenElement) {
+      div.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+
+  div.appendChild(newstr);
+  remoteStreamContainer.appendChild(div);
+
+  function onPlayerReady(event) {
+	event.target.setPlaybackQuality('hd720');
+    event.target.seekTo(ts);
+    event.target.playVideo();
+    if (playState != -2)
+	  event.target.stopVideo();
+  }
+
+  player = new YT.Player('player='+id, {
+    style: "height: auto; width: 100%;",
+    videoId: id,
+    playerVars: { 'controls': 0 },
+    disablekb: 1,
+    events: {
+      'onReady': onPlayerReady,
+      //'onStateChange': onPlayerStateChange
+    }
+  });
+
+  videos[id] = player;
+}
+
+
+async function getVideoHost() {
   videoId = document.getElementById("video-id").value;
 
   let div = document.createElement("div");
@@ -531,105 +624,30 @@ async function getVideo() {
 }
 
 
-addStreamButton.onclick = async () => {
-  document.getElementById("add-stream-popup").classList.add("show");
-}
 
-recordButton.on = false
-recordButton.onclick = async () => {
-	if (recordButton.on) {
-		recordButton.on = false;
-		recordButton.style.backgroundColor = "red";
-		res = await sendStopRecording();
-		if (res)
-			recordButton.style.backgroundColor = "black";
-	} else {
-		recordButton.on = true;
-		recordButton.style.backgroundColor = "red";
-		res = await sendStartRecording();
-		if (res)
-			recordButton.style.backgroundColor = "lightblue";
-	}
-}
-
-document.getElementById("close-popup").onclick = () => {
-  document.getElementById("add-stream-popup").classList.remove("show");
-}
-
-document.getElementById("get-camera").onclick = getCamera;
-document.getElementById("get-screen").onclick = getScreen;
-document.getElementById("get-video").onclick = getVideo;
-
-function displayStats() {
-  document.getElementById("stats-id").textContent = "ID de sala: " + roomId;
-  document.getElementById("stats-number").textContent = "Conectados: " + (streams.childElementCount);
-}
-
-
-
+/*
+ *
+ * CHAT
+ *
+ */
 
 let chat;
 
-async function startChat() {
+async function startChat(host = false) {
   await waitForClient();
-  chat = clientLocal.createDataChannel("chat");
+  chat = clientHost.createDataChannel("chat");
   chat.onmessage = (msg) => {
     chatElement.value += msg.data;
   }
   messageElement.onkeyup = (ev) => {
     if(ev.keyCode == 13) {
-      chat.send("Host:\n" + messageElement.value);
+      chat.send((host ? "Host:\n" : UNIQUE_ID + ':\n') + messageElement.value);
       chatElement.value += "Tú:\n";
       chatElement.value += messageElement.value;
       messageElement.value = "";
     }
   }
 }
-
-startChat();
-getCamera();
-//start();
-
-/*
-if(roomId != null) {
-  connect((success, error) => {
-    if(success) {
-      document.getElementById("overlay").style.display = "none";
-      cameraElement.click();
-    } else {
-      alert(error);
-    }
-  });
-}
-
-document.getElementById("create").onclick = (event) => {
-  hostId = Math.random().toString(16).substr(2, 8);
-  roomId = hostId.hashCode();
-  console.log(hostId);
-  console.log(roomId);
-  connect((success, error) => {
-    if(success) {
-      document.getElementById("overlay").style.display = "none";
-      cameraElement.click();
-    } else {
-      alert(error);
-    }
-  });
-};
-
-
-document.getElementById("join").onclick = (event) => {
-  roomId = document.getElementById("room-id").value;
-  connect((success, error) => {
-    if(success) {
-      document.getElementById("overlay").style.display = "none";
-      cameraElement.click();
-    } else {
-      alert(error);
-    }
-  });
-};*/
-
 
 
 
